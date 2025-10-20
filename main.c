@@ -3,6 +3,19 @@
 #include <stdint.h>
 #include "util.h"
 
+
+
+// 計算連續相同字元的數量
+int continuous_count(const char *p){
+    int count = 0;
+    char first = *p;
+    while (*p == first && *p != '\0') {
+        count++;
+        p++;
+    }
+    return count;
+}
+
 void interpret(const char *const input){
 
     //initialize the tape with 30000 zeroes
@@ -15,17 +28,38 @@ void interpret(const char *const input){
     for (int i=0;(current_char=input[i])!='\0';++i){
         switch (current_char) {
             case '>':
-                ++ptr;
-                break;
+                {
+                    int count = continuous_count(&input[i]);
+                    ptr += count;
+                    i += count - 1;  // -1 因為 for 迴圈會 ++i
+                    // ++ptr;
+                    break;
+                }
             case '<':
-                --ptr;
+                {
+                    int count = continuous_count(&input[i]);
+                    ptr -= count;
+                    i += count - 1;
+                    // --ptr;
                 break;
+                }
             case '+':
-                ++(*ptr);
+            {
+                
+                int count = continuous_count(&input[i]);
+                *ptr += count;  // 直接加，不用迴圈
+                i += count - 1;
+                
                 break;
-            case '-':
-                --(*ptr);
+            }
+            case '-':{
+               
+                int count=continuous_count(&input[i]);
+                *ptr -= count;  // 直接減，不用迴圈
+                i += count - 1;
+                
                 break;
+            }
             case '.':
                 putchar(*ptr);
                 break;
