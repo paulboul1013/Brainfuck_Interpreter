@@ -16,6 +16,34 @@ int continuous_count(const char *p){
     return count;
 }
 
+//Clear loops & Copy loops & Multiplication loops optimization
+int check_loops(char *p,int *index,int *mult){
+    int res,offset=0,_index=0;
+    if (*(p+1)!='-') return -1;
+    p+=2;
+    while (*p!=']'){
+        if (*p=='[' || *p=='-' || *p=='.' || *p==',') {
+            return -1;
+        }
+        res=continuous_count(p);
+        if (*p=='>') {
+            offset+=res;
+        }
+        else if (*p=='<') {
+            offset-=res;
+        }
+        else if (*p=='+'){
+            index[_index]=offset;
+            mult[_index]=res;
+            _index++;
+        }
+        p+=res;
+    }
+    if (offset!=0) return -1;
+    return _index;
+}
+
+
 void interpret(const char *const input){
 
     //initialize the tape with 30000 zeroes
@@ -67,17 +95,44 @@ void interpret(const char *const input){
                 *ptr=getchar();
                 break;
             case '[':
-                if (!(*ptr)){
-                    int loop=1;
-                    while (loop>0){
-                        current_char=input[++i];
-                        if (current_char==']'){
-                            --loop;
+                // 嘗試優化循環（清零、複製、乘法循環）
+                {
+                    int index[100], mult[100];
+                    int loop_info = check_loops((char*)&input[i], index, mult);
+                    
+                    if (loop_info >= 0 && *ptr != 0) {
+                        // 可以優化的循環
+                        for (int j = 0; j < loop_info; j++) {
+                            ptr[index[j]] += *ptr * mult[j];
                         }
-                        else if (current_char=='['){
-                            ++loop;
+                        *ptr = 0;  // 清零當前單元格
+                        
+                        // 跳到對應的 ]
+                        int loop = 1;
+                        while (loop > 0) {
+                            current_char = input[++i];
+                            if (current_char == ']') {
+                                --loop;
+                            }
+                            else if (current_char == '[') {
+                                ++loop;
+                            }
                         }
                     }
+                    else if (!(*ptr)) {
+                        // 如果當前單元格為0，跳過整個循環
+                        int loop = 1;
+                        while (loop > 0) {
+                            current_char = input[++i];
+                            if (current_char == ']') {
+                                --loop;
+                            }
+                            else if (current_char == '[') {
+                                ++loop;
+                            }
+                        }
+                    }
+                    // 否則正常執行循環（不做任何事，讓程式繼續執行）
                 }
                 break;
 
