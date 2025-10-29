@@ -20,18 +20,46 @@ void compile(const char * const text_body){
     puts(prologue);
 
     for(unsigned long i=0;text_body[i]!='\0';++i){
-        switch (text_body[i]){
+        // 指令合併優化：計算連續相同指令的數量
+        int count = 1;
+        char current = text_body[i];
+        
+        // 只對 +, -, >, < 進行合併優化
+        if (current == '+' || current == '-' || current == '>' || current == '<') {
+            while (text_body[i+1] == current) {
+                count++;
+                i++;
+            }
+        }
+        
+        switch (current){
             case '>':
-                puts("    incl %ecx");
+                if (count == 1) {
+                    puts("    incl %ecx");
+                } else {
+                    printf("    addl $%d, %%ecx\n", count);
+                }
                 break;
             case '<':
-                puts("    decl %ecx");
+                if (count == 1) {
+                    puts("    decl %ecx");
+                } else {
+                    printf("    subl $%d, %%ecx\n", count);
+                }
                 break;
             case '+':
-                puts("    incb (%ecx)");
+                if (count == 1) {
+                    puts("    incb (%ecx)");
+                } else {
+                    printf("    addb $%d, (%%ecx)\n", count);
+                }
                 break;
             case '-':
-                puts("    decb (%ecx)");
+                if (count == 1) {
+                    puts("    decb (%ecx)");
+                } else {
+                    printf("    subb $%d, (%%ecx)\n", count);
+                }
                 break;
             case '.':
                 // 使用 sys_write 系統調用
