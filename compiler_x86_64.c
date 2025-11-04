@@ -3,6 +3,51 @@
 #include <string.h>
 #include "util.h"
 
+// 死代碼消除優化：移除相互抵消的指令
+// 返回優化後的新字符串（需要調用者 free）
+char* eliminate_dead_code(const char *text_body) {
+    size_t len = strlen(text_body);
+    char *optimized = malloc(len + 1);
+    if (optimized == NULL) {
+        err("Memory allocation failed");
+    }
+    
+    size_t write_pos = 0;
+    
+    for (size_t i = 0; i < len; i++) {
+        char current = text_body[i];
+        
+        // 只處理 Brainfuck 有效指令
+        if (current != '+' && current != '-' && 
+            current != '>' && current != '<' && 
+            current != '.' && current != ',' && 
+            current != '[' && current != ']') {
+            continue; // 跳過非 Brainfuck 指令（註解等）
+        }
+        
+        // 檢查是否可以與前一個指令抵消
+        if (write_pos > 0) {
+            char prev = optimized[write_pos - 1];
+            
+            // 檢測相互抵消的指令對
+            if ((prev == '+' && current == '-') || 
+                (prev == '-' && current == '+') ||
+                (prev == '>' && current == '<') || 
+                (prev == '<' && current == '>')) {
+                // 抵消：移除前一個指令，不添加當前指令
+                write_pos--;
+                continue;
+            }
+        }
+        
+        // 添加當前指令
+        optimized[write_pos++] = current;
+    }
+    
+    optimized[write_pos] = '\0';
+    return optimized;
+}
+
 // 檢測並展開簡單迴圈（x86-64 版本）
 // 返回值：如果可以展開，返回跳過的字符數；否則返回 0
 int try_unroll_loop_x86_64(const char *text_body, unsigned long start_pos) {
@@ -218,9 +263,13 @@ int main(int argc,char *argv[]){
         err("Unable to read program text file");
     }
 
-    compile(text_body);
-
+    // 死代碼消除優化
+    char *optimized_body = eliminate_dead_code(text_body);
     free(text_body);
+
+    compile(optimized_body);
+
+    free(optimized_body);
     return 0;
 }
 
