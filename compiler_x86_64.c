@@ -144,6 +144,10 @@ void compile(const char * const text_body){
     struct stack stack={.size=0,.items={0}};
 
     // 使用 64 位元系統調用，不依賴 C 庫
+    // 暫存器分配優化：
+    // %r12 = 數據指標（指向當前記憶體位置）
+    // %r13 = 常數 1（用於 sys_write, stdout, 長度）
+    // %r14 = 常數 0（用於 sys_read, stdin）
     const char * const prologue=
         ".section .note.GNU-stack,\"\",%progbits\n"
         ".section .data\n"
@@ -151,7 +155,9 @@ void compile(const char * const text_body){
         ".section .text\n"
         ".global _start\n"
         "_start:\n"
-        "    leaq memory(%rip), %r12\n";  // r12 指向記憶體起始（使用 RIP-relative 尋址）
+        "    leaq memory(%rip), %r12\n"  // r12 指向記憶體起始（使用 RIP-relative 尋址）
+        "    movq $1, %r13\n"            // r13 = 1（常數暫存器）
+        "    movq $0, %r14\n";           // r14 = 0（常數暫存器）
     puts(prologue);
 
     for(unsigned long i=0;text_body[i]!='\0';++i){
@@ -198,20 +204,20 @@ void compile(const char * const text_body){
                 break;
             case '.':
                 // 使用 sys_write 系統調用 (64-bit)
-                // rax = 1 (sys_write), rdi = 1 (stdout), rsi = buffer, rdx = count
-                puts("    movq $1, %rax");       // sys_write
-                puts("    movq $1, %rdi");       // stdout
+                // 利用暫存器分配優化：r13 = 1（sys_write, stdout, 長度）
+                puts("    movq %r13, %rax");     // sys_write = 1（從 r13）
+                puts("    movq %r13, %rdi");     // stdout = 1（從 r13）
                 puts("    movq %r12, %rsi");     // 指向字元
-                puts("    movq $1, %rdx");       // 長度 = 1
+                puts("    movq %r13, %rdx");     // 長度 = 1（從 r13）
                 puts("    syscall");
                 break;
             case ',':
                 // 使用 sys_read 系統調用 (64-bit)
-                // rax = 0 (sys_read), rdi = 0 (stdin), rsi = buffer, rdx = count
-                puts("    movq $0, %rax");       // sys_read
-                puts("    movq $0, %rdi");       // stdin
+                // 利用暫存器分配優化：r14 = 0（sys_read, stdin），r13 = 1（長度）
+                puts("    movq %r14, %rax");     // sys_read = 0（從 r14）
+                puts("    movq %r14, %rdi");     // stdin = 0（從 r14）
                 puts("    movq %r12, %rsi");     // 指向字元
-                puts("    movq $1, %rdx");       // 長度 = 1
+                puts("    movq %r13, %rdx");     // 長度 = 1（從 r13）
                 puts("    syscall");
                 break;
             case '[':

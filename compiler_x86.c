@@ -144,6 +144,10 @@ void compile(const char * const text_body){
     struct stack stack={.size=0,.items={0}};
 
     // 使用系統調用，不依賴 C 庫
+    // 暫存器分配優化：
+    // %ecx = 數據指標（指向當前記憶體位置）
+    // %esi = 常數 1（用於 sys_write, stdout, 長度）
+    // %edi = 常數 0（用於 stdin）
     const char * const prologue=
         ".section .note.GNU-stack,\"\",%progbits\n"
         ".section .data\n"
@@ -151,7 +155,9 @@ void compile(const char * const text_body){
         ".section .text\n"
         ".global _start\n"
         "_start:\n"
-        "    leal memory, %ecx\n";       // ecx 指向記憶體起始
+        "    leal memory, %ecx\n"        // ecx 指向記憶體起始
+        "    movl $1, %esi\n"            // esi = 1（常數暫存器）
+        "    movl $0, %edi\n";           // edi = 0（常數暫存器）
     puts(prologue);
 
     for(unsigned long i=0;text_body[i]!='\0';++i){
@@ -198,23 +204,25 @@ void compile(const char * const text_body){
                 break;
             case '.':
                 // 使用 sys_write 系統調用
+                // 利用暫存器分配優化：esi = 1（stdout, 長度）
                 puts("    movl $4, %eax");      // sys_write
-                puts("    movl $1, %ebx");      // stdout
-                puts("    movl %ecx, %edx");    // 指向字元
-                puts("    pushl %ecx");         // 保存 ecx
-                puts("    movl %edx, %ecx");    // 數據指針
-                puts("    movl $1, %edx");      // 長度 = 1
+                puts("    movl %esi, %ebx");    // stdout = 1（從 esi）
+                puts("    pushl %ecx");         // 保存 ecx（數據指標）
+                puts("    movl %ecx, %edx");    // 暫存數據指針
+                puts("    movl %edx, %ecx");    // 數據指針（int 0x80 的 ecx 參數）
+                puts("    movl %esi, %edx");    // 長度 = 1（從 esi）
                 puts("    int $0x80");
                 puts("    popl %ecx");          // 恢復 ecx
                 break;
             case ',':
                 // 使用 sys_read 系統調用
+                // 利用暫存器分配優化：edi = 0（stdin），esi = 1（長度）
                 puts("    movl $3, %eax");      // sys_read
-                puts("    movl $0, %ebx");      // stdin
-                puts("    pushl %ecx");         // 保存 ecx
-                puts("    movl %ecx, %edx");    // 數據指針
-                puts("    movl %edx, %ecx");    // 數據指針
-                puts("    movl $1, %edx");      // 長度 = 1
+                puts("    movl %edi, %ebx");    // stdin = 0（從 edi）
+                puts("    pushl %ecx");         // 保存 ecx（數據指標）
+                puts("    movl %ecx, %edx");    // 暫存數據指針
+                puts("    movl %edx, %ecx");    // 數據指針（int 0x80 的 ecx 參數）
+                puts("    movl %esi, %edx");    // 長度 = 1（從 esi）
                 puts("    int $0x80");
                 puts("    popl %ecx");          // 恢復 ecx
                 break;
