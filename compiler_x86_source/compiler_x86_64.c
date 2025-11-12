@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "util.h"
+#include "../util.h"
 
 // 死代碼消除優化：移除相互抵消的指令
 // 返回優化後的新字符串（需要調用者 free）
