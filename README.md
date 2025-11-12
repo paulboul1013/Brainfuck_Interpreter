@@ -7,6 +7,7 @@
 -  **Brainfuck 解譯器** - 直接執行 Brainfuck 程式
 -  **x86-32 編譯器** - 將 Brainfuck 編譯為原生 32 位元機器碼
 -  **x86-64 編譯器** - 將 Brainfuck 編譯為原生 64 位元機器碼 
+-  **LLVM 後端** - 產生 LLVM IR，跨平台以 clang 執行
 -  **高效能** - 編譯版本比解譯版本快 **4-10 倍**
 -  **系統調用** - 編譯器使用 Linux 系統調用，不依賴 C 標準庫
 -  **30,000 記憶體單元** - 符合 Brainfuck 標準規範
@@ -118,6 +119,54 @@ Hello World!
 
 ---
 
+### 方式 4：使用 LLVM 後端（跨平台）
+
+#### 先決條件
+請先安裝 LLVM/Clang 工具鏈（含 `clang`、`llc`、`lli`）：
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y clang llvm llvm-runtime
+```
+
+#### 1. 編譯 LLVM IR 產生器
+在專案根目錄：
+```bash
+gcc -O2 -o main llvm/llvm.c
+# 或（在子資料夾內編譯）
+# make
+```
+
+#### 2. 產生 LLVM IR
+```bash
+./main hello.bf > hello.ll
+```
+
+#### 3. 使用 clang 直接產生可執行檔
+```bash
+clang -O2 hello.ll -o hello
+./hello
+```
+
+（可選）使用 llc + clang：
+```bash
+llc -O2 -filetype=obj hello.ll -o hello.o
+clang hello.o -o hello
+./hello
+```
+
+（可選）使用 LLVM 直譯器 `lli` 執行：
+```bash
+lli hello.ll
+```
+
+#### 注意事項
+- 產生的 IR 內含 `@llvm.memset.p0i8.i64` 宣告，直接以 `clang`/`llc` 處理即可，無需額外連結。
+- 產生器會自動合併連續的 `+ - > <` 指令，並正確處理巢狀 `[]` 迴圈。
+- 若 Brainfuck 程式括號不匹配，產生器會直接報錯。
+
+---
+
 
 
 ### 編譯器實作原
@@ -183,6 +232,7 @@ Hello World!
 -  **Brainfuck 解譯器** - 完整實作，支援所有 8 種指令
 -  **x86-32 編譯器** - 使用系統調用，不依賴外部庫
 -  **x86-64 編譯器** - 64 位元原生支援，使用現代 syscall 指令
+-  **LLVM 後端** - 產生 LLVM IR，支援多平台與 LLVM 工具鏈
 -  **效能優化** - 編譯版本比解譯版本快 4-10 倍
 -  **指令合併優化** - 自動將連續的 `+++` / `---` / `>>>` / `<<<` 合併為單一指令，減少指令數量
 -  **迴圈展開優化** - 自動展開簡單迴圈（如 `[-]`、`[+]`、`[>]`、`[<]` 等），優化效能
@@ -195,10 +245,9 @@ Hello World!
 ## 未來實作 
 
 ### 更多平台編譯器
-- [ ] **ARM 編譯器** - 針對 ARM 架構（Raspberry Pi、行動裝置）
 - [ ] **RISC-V 編譯器** - 支援開源 RISC-V 指令集
-- [ ] **LLVM 後端** - 使用 LLVM IR，支援多平台
-- [ ] **WebAssembly 編譯器** - 編譯為 WASM，在瀏覽器執行
+- [x] **LLVM 後端** - 使用 LLVM IR，支援多平台
+
 
 ### 編譯器優化
 - [x] **指令合併** - 將連續的 `+++` 優化為 `addb $3`，和其他`-`，`>`,`<`等相關符號
@@ -208,13 +257,10 @@ Hello World!
 
 ### 其他增強功能
 - [ ] **除錯模式** - 顯示執行過程與記憶體狀態
-- [ ] **語法檢查** - 編譯前檢查括號配對
-- [ ] **互動式 REPL** - 即時輸入與執行指令
-- [ ] **JIT 編譯器** - 即時編譯提升解譯效能
 
 
 ---
 
-**最後更新**：2025-11-4
+**最後更新**：2025-11-12
 
 
