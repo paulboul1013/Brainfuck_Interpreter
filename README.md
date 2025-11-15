@@ -28,6 +28,20 @@ Brainfuck 是一種極簡主義的程式語言，只包含 8 個指令：
 
 ## 編譯與執行
 
+### debug模式
+```bash
+# 一般模式
+./bf hello.bf
+
+# 除錯模式（預設視窗 8）
+./bf -d hello.bf
+
+# 除錯模式 + 自訂視窗寬度
+./bf -d -w 12 hello.bf
+# 或
+./bf --debug --debug-window 12 hello.bf
+```
+
 ### 方式 1：使用解譯器（簡單快速）
 
 #### 編譯解譯器
@@ -259,6 +273,5 @@ lli hello.ll
 
 ---
 
-**最後更新**：2025-11-12
 
 
