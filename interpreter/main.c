@@ -3,8 +3,53 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
-#include "util.h"
+#include "../util.h"
+#include <ctype.h>
 
+
+
+// 除錯輸出：顯示指令計數器、當前指令、資料指標與記憶體視窗
+static void debug_print_state(int ip, char instr, const uint8_t *tape, const uint8_t *ptr, int window){
+    int dp = (int)(ptr - tape);
+    if (dp < 0) dp = 0;
+    if (dp > 29999) dp = 29999;
+    int start = dp - window;
+    int end = dp + window;
+    if (start < 0) start = 0;
+    if (end > 29999) end = 29999;
+
+	// 產生可讀的字元顯示
+	char chbuf[8];
+	const char *chrepr;
+	unsigned v = (unsigned)*ptr;
+	if (v == 0) {
+		chrepr = "\\0";
+	} else if (v == '\n') {
+		chrepr = "\\n";
+	} else if (v == '\r') {
+		chrepr = "\\r";
+	} else if (v == '\t') {
+		chrepr = "\\t";
+	} else if (isprint((int)v)) {
+		chbuf[0] = (char)v;
+		chbuf[1] = '\0';
+		chrepr = chbuf;
+	} else {
+		snprintf(chbuf, sizeof(chbuf), "\\x%02X", v & 0xFFu);
+		chrepr = chbuf;
+	}
+
+	fprintf(stderr, "[DEBUG] ip=%d instr=%c dp=%d val=%u ch='%s' | tape[%d..%d]: ",
+	        ip, instr, dp, v, chrepr, start, end);
+    for (int i = start; i <= end; ++i){
+        if (i == dp){
+            fprintf(stderr, "[%u] ", (unsigned)tape[i]);
+        }else{
+            fprintf(stderr, "%u ", (unsigned)tape[i]);
+        }
+    }
+    fprintf(stderr, "\n");
+}
 
 
 // 計算連續相同字元的數量
@@ -96,7 +141,7 @@ char* remove_non_instructions(const char *input) {
 }
 
 
-void interpret(const char *const input){
+void interpret(const char *const input, int debug, int debug_window){
 
     //initialize the tape with 30000 zeroes
     uint8_t tape[30000]={0};
@@ -105,6 +150,7 @@ void interpret(const char *const input){
     uint8_t *ptr=tape;
 
     char current_char;
+	int last_stdout_char = '\n'; // 追蹤最近一次 stdout 字元，預設視為已換行
     for (int i=0;(current_char=input[i])!='\0';++i){
         switch (current_char) {
             case '>':
@@ -141,10 +187,12 @@ void interpret(const char *const input){
                 break;
             }
             case '.':
-                putchar(*ptr);
+				putchar(*ptr);
+				fflush(stdout);
+				last_stdout_char = *ptr;
                 break;
             case ',':
-                *ptr=getchar();
+				*ptr=getchar();
                 break;
             case '[':
                 {
@@ -262,15 +310,42 @@ void interpret(const char *const input){
                 }
                 break;
         }
+        if (debug){
+			// 確保除錯輸出與正常輸出分行，避免混寫在同一列
+			if (last_stdout_char != '\n') {
+				fputc('\n', stderr);
+				last_stdout_char = '\n';
+			}
+			debug_print_state(i, current_char, tape, ptr, debug_window);
+        }
     }
 }
 
 int main(int argc,char *argv[]){
-    if (argc!=2) {
-        err("Usage: interpreter <inputfile>");
+    int debug = 0;
+	int debug_window = 8;
+    const char *filepath = NULL;
+
+	// 參數解析：支援 -d/--debug 與 -w/--debug-window <N> 以及檔名
+    for (int i = 1; i < argc; ++i){
+        if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--debug") == 0){
+            debug = 1;
+		}else if ((strcmp(argv[i], "-w") == 0 || strcmp(argv[i], "--debug-window") == 0) && (i + 1 < argc)){
+			int w = atoi(argv[++i]);
+			if (w < 1) w = 1;
+			if (w > 64) w = 64; // 合理上限
+			debug_window = w;
+        }else if (filepath == NULL){
+            filepath = argv[i];
+        }else{
+			err("Usage: interpreter [-d|--debug] [-w|--debug-window N] <inputfile>");
+        }
+    }
+    if (filepath == NULL){
+		err("Usage: interpreter [-d|--debug] [-w|--debug-window N] <inputfile>");
     }
 
-    char *file_content=read_file(argv[1]);
+    char *file_content=read_file(filepath);
     if (file_content==NULL){
         err("can't open file");
     }
@@ -283,7 +358,7 @@ int main(int argc,char *argv[]){
         err("memory allocation failed");
     }
     
-    interpret(cleaned_content);
+	interpret(cleaned_content, debug, debug_window);
     free(cleaned_content);
 
     return 0;
